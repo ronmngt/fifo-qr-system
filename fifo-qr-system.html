@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FIFO QR Code Inventory System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: #f1f1f1;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            border-radius: 5px 5px 0 0;
+            margin-right: 5px;
+        }
+        .tab.active {
+            background-color: white;
+            border-bottom: 1px solid white;
+            margin-bottom: -1px;
+            font-weight: bold;
+        }
+        .tab-content {
+            display: none;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-top: none;
+            animation: fadeIn 0.5s;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        #qrcode {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .qr-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+        }
+        .inventory-list {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .inventory-list th, .inventory-list td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .inventory-list th {
+            background-color: #f2f2f2;
+        }
+        .inventory-list tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .inventory-list tr:hover {
+            background-color: #f1f1f1;
+        }
+        .violation {
+            background-color: #ffdddd !important;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .status-good {
+            background-color: #2ecc71;
+        }
+        .status-warning {
+            background-color: #f39c12;
+        }
+        .status-violation {
+            background-color: #e74c3c;
+        }
+        .dashboard-card {
+            background-color: white;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .dashboard-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            flex: 1;
+            margin: 0 10px;
+            background-color: white;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            padding: 15px;
+            text-align: center;
+        }
+        .stat-card h3 {
+            margin-top: 0;
+            color: #7f8c8d;
+            font-size: 16px;
+        }
+        .stat-card p {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 5px 0;
+            color: #2c3e50;
+        }
+        #scanner-container {
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        .error {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .success {
+            color: #2ecc71;
+            font-weight: bold;
+        }
+        #scan-result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+        .result-success {
+            background-color: #d5f5e3;
+            border: 1px solid #2ecc71;
+        }
+        .result-error {
+            background-color: #fadbd8;
+            border: 1px solid #e74c3c;
+        }
+        .print-section {
+            margin-top: 20px;
+            text-align: center;
+        }
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #qrcode-print, #qrcode-print * {
+                visibility: visible;
+            }
+            #qrcode-print {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>FIFO QR Code Inventory System</h1>
+        
+        <div class="tabs">
+            <div class="tab active" onclick="openTab(event, 'dashboard')">Dashboard</div>
+            <div class="tab" onclick="openTab(event, 'generate')">Generate QR Codes</div>
+            <div class="tab" onclick="openTab(event, 'scan')">Scan Items</div>
+            <div class="tab" onclick="openTab(event, 'inventory')">Inventory</div>
+        </div>
+        
+        <div id="dashboard" class="tab-content active">
+            <div class="dashboard-stats">
+                <div class="stat-card">
+                    <h3>Total Inventory Items</h3>
+                    <p id="total-items">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>FIFO Compliance Rate</h3>
+                    <p id="fifo-compliance">100%</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Items Near Expiry</h3>
+                    <p id="expiring-soon">0</p>
+                </div>
+            </div>
+            
+            <div class="dashboard-card">
+                <h2>FIFO Status</h2>
+                <div>
+                    <span class="status-indicator status-good"></span> Compliant
+                    <span class="status-indicator status-warning" style="margin-left: 20px;"></span> Warning
+                    <span class="status-indicator status-violation" style="margin-left: 20px;"></span> Violation
+                </div>
+                <div id="dashboard-recent-activity" style="margin-top: 20px;">
+                    <h3>Recent Activity</h3>
+                    <table class="inventory-list">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Action</th>
+                                <th>Item</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-activity-body">
+                            <!-- Activity will be added here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div id="generate" class="tab-content">
+            <h2>Generate Inventory QR Code</h2>
+            <div class="form-group">
+                <label for="item-name">Item Name/SKU:</label>
+                <input type="text" id="item-name" placeholder="Enter item name or SKU">
+            </div>
+            <div class="form-group">
+                <label for="batch-number">Batch/Lot Number:</label>
+                <input type="text" id="batch-number" placeholder="Enter batch or lot number">
+            </div>
+            <div class="form-group">
+                <label for="quantity">Quantity:</label>
+                <input type="number" id="quantity" placeholder="Enter quantity" min="1" value="1">
+            </div>
+            <div class="form-group">
+                <label for="location">Storage Location:</label>
+                <input type="text" id="location" placeholder="Enter storage location">
+            </div>
+            <div class="form-group">
+                <label for="expiry-date">Expiration Date (if applicable):</label>
+                <input type="date" id="expiry-date">
+            </div>
+            <button id="generate-btn">Generate QR Code</button>
+            
+            <div class="qr-container">
+                <div id="qrcode"></div>
+                <div id="qr-details"></div>
+                <div class="print-section">
+                    <div id="qrcode-print"></div>
+                    <button id="print-btn" style="display: none;">Print QR Code</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="scan" class="tab-content">
+            <h2>Scan QR Code</h2>
+            <p>Use this scanner when retrieving or moving inventory items to ensure FIFO compliance.</p>
+            
+            <div class="form-group">
+                <label for="scan-action">Action:</label>
+                <select id="scan-action">
+                    <option value="retrieve">Retrieve Item (Use/Ship)</option>
+                    <option value="move">Move Item</option>
+                    <option value="verify">Verify Item</option>
+                </select>
+            </div>
+            
+            <div class="form-group" id="new-location-group" style="display: none;">
+                <label for="new-location">New Location:</label>
+                <input type="text" id="new-location" placeholder="Enter new storage location">
+            </div>
+            
+            <button id="start-scanner">Start Scanner</button>
+            <button id="stop-scanner" style="display: none; background-color: #e74c3c;">Stop Scanner</button>
+            
+            <div id="scanner-container"></div>
+            
+            <div id="scan-result">
+                <h3>Scan Result</h3>
+                <div id="scan-result-content"></div>
+            </div>
+        </div>
+        
+        <div id="inventory" class="tab-content">
+            <h2>Current Inventory</h2>
+            <div class="form-group">
+                <label for="inventory-filter">Filter by Item/SKU:</label>
+                <input type="text" id="inventory-filter" placeholder="Filter inventory...">
+            </div>
+            <div class="form-group">
+                <label>Sort by:</label>
+                <select id="inventory-sort">
+                    <option value="date-asc">Date Added (Oldest First)</option>
+                    <option value="date-desc">Date Added (Newest First)</option>
+                    <option value="expiry-asc">Expiration Date (Soonest First)</option>
+                    <option value="name-asc">Item Name (A-Z)</option>
+                </select>
+            </div>
+            <table class="inventory-list">
+                <thead>
+                    <tr>
+                        <th>Item/SKU</th>
+                        <th>Batch/Lot</th>
+                        <th>Quantity</th>
+                        <th>Location</th>
+                        <th>Date Added</th>
+                        <th>Expiration</th>
+                        <th>FIFO Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="inventory-body">
+                    <!-- Inventory items will be added here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Storage for our inventory items
+        let inventoryItems = [];
+        let activityLog = [];
+        
+        // Initialize from localStorage if available
+        function initializeApp() {
+            if (localStorage.getItem('fifoInventory')) {
+                try {
+                    inventoryItems = JSON.parse(localStorage.getItem('fifoInventory'));
+                } catch (e) {
+                    console.error("Error loading inventory data:", e);
+                    inventoryItems = [];
+                }
+            }
+            
+            if (localStorage.getItem('fifoActivityLog')) {
+                try {
+                    activityLog = JSON.parse(localStorage.getItem('fifoActivityLog'));
+                } catch (e) {
+                    console.error("Error loading activity log:", e);
+                    activityLog = [];
+                }
+            }
+            
+            updateInventoryDisplay();
+            updateDashboard();
+            updateRecentActivity();
+        }
+        
+        // Tab functionality
+        function openTab(evt, tabName) {
+            let tabcontents = document.getElementsByClassName("tab-content");
+            for (let i = 0; i < tabcontents.length; i++) {
+                tabcontents[i].classList.remove("active");
+            }
+            
+            let tabs = document.getElementsByClassName("tab");
+            for (let i = 0; i < tabs.length; i++) {
+                tabs[i].classList.remove("active");
+            }
+            
+            document.getElementById(tabName).classList.add("active");
+            evt.currentTarget.classList.add("active");
+            
+            // Stop scanner if switching away from scan tab
+            if (tabName !== 'scan' && html5QrCodeScanner) {
+                try {
+                    html5QrCodeScanner.clear();
+                } catch (error) {
+                    console.log("Scanner not active or already cleared");
+                }
+                document.getElementById('start-scanner').style.display = 'block';
+                document.getElementById('stop-scanner').style.display = 'none';
+                document.getElementById('scanner-container').innerHTML = '';
+            }
+        }
+        
+        // QR Code Generation
+        document.getElementById('generate-btn').addEventListener('click', function() {
+            const itemName = document.getElementById('item-name').value;
+            const batchNumber = document.getElementById('batch-number').value;
+            const quantity = document.getElementById('quantity').value;
+            const location = document.getElementById('location').value;
+            const expiryDate = document.getElementById('expiry-date').value;
+            
+            if (!itemName) {
+                alert('Please enter an item name or SKU');
+                return;
+            }
+            
+            if (!location) {
+                alert('Please enter a storage location');
+                return;
+            }
+            
+            const timestamp = new Date().toISOString();
+            const itemId = generateUniqueId();
+            
+            const itemData = {
+                id: itemId,
+                name: itemName,
+                batch: batchNumber,
+                quantity: parseInt(quantity),
+                location: location,
+                dateAdded: timestamp,
+                expiryDate: expiryDate || null,
+                fifoStatus: 'compliant' // Default status
+            };
+            
+            // Convert to JSON string for QR code
+            const qrData = JSON.stringify(itemData);
+            
+            // Generate QR code
+            document.getElementById('qrcode').innerHTML = '';
+            const qrcode = new QRCode(document.getElementById("qrcode"), {
+                text: qrData,
+                width: 200,
+                height: 200,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+            
+            // Display details below QR code
+            const detailsHTML = `
+                <div style="margin-top: 15px; text-align: left; max-width: 300px;">
+                    <p><strong>Item:</strong> ${itemName}</p>
+                    ${batchNumber ? `<p><strong>Batch/Lot:</strong> ${batchNumber}</p>` : ''}
+                    <p><strong>Quantity:</strong> ${quantity}</p>
+                    <p><strong>Location:</strong> ${location}</p>
+                    <p><strong>Date Added:</strong> ${new Date(timestamp).toLocaleString()}</p>
+                    ${expiryDate ? `<p><strong>Expires:</strong> ${new Date(expiryDate).toLocaleDateString()}</p>` : ''}
+                    <p><strong>ID:</strong> ${itemId}</p>
+                </div>
+            `;
+            document.getElementById('qr-details').innerHTML = detailsHTML;
+            
+            // Set up print version
+            document.getElementById('qrcode-print').innerHTML = `
+                <div style="padding: 20px; text-align: center;">
+                    ${document.getElementById('qrcode').innerHTML}
+                    <div style="margin-top: 10px; font-size: 12px; text-align: center;">
+                        <p><strong>${itemName}</strong> ${batchNumber ? `(${batchNumber})` : ''}</p>
+                        <p>Qty: ${quantity} | Added: ${new Date(timestamp).toLocaleDateString()}</p>
+                        ${expiryDate ? `<p>Expires: ${new Date(expiryDate).toLocaleDateString()}</p>` : ''}
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('print-btn').style.display = 'block';
+            
+            // Add to inventory
+            inventoryItems.push(itemData);
+            saveInventory();
+            
+            // Log activity
+            logActivity('add', itemData, 'Item added to inventory');
+            
+            // Update displays
+            updateInventoryDisplay();
+            updateDashboard();
+        });
+        
+        // Print QR code
+        document.getElementById('print-btn').addEventListener('click', function() {
+            window.print();
+        });
+        
+        // Unique ID generator for inventory items
+        function generateUniqueId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+        
+        // Save inventory to localStorage
+        function saveInventory() {
+            localStorage.setItem('fifoInventory', JSON.stringify(inventoryItems));
+        }
+        
+        // Save activity log to localStorage
+        function saveActivityLog() {
+            localStorage.setItem('fifoActivityLog', JSON.stringify(activityLog));
+        }
+        
+        // Log activity
+        function logActivity(action, item, details) {
+            const activity = {
+                timestamp: new Date().toISOString(),
+                action: action,
+                item: item,
+                details: details
+            };
+            
+            activityLog.unshift(activity); // Add to beginning
+            
+            // Keep log at reasonable size
+            if (activityLog.length > 100) {
+                activityLog = activityLog.slice(0, 100);
+            }
+            
+            saveActivityLog();
+            updateRecentActivity();
+        }
+        
+        // Update inventory display
+        function updateInventoryDisplay() {
+            const tbody = document.getElementById('inventory-body');
+            tbody.innerHTML = '';
+            
+            // Apply filters
+            const filterText = document.getElementById('inventory-filter').value.toLowerCase();
+            const sortMethod = document.getElementById('inventory-sort').value;
+            
+            // Create a copy for sorting
+            let displayItems = [...inventoryItems];
+            
+            // Filter items
+            if (filterText) {
+                displayItems = displayItems.filter(item => 
+                    item.name.toLowerCase().includes(filterText) || 
+                    (item.batch && item.batch.toLowerCase().includes(filterText))
+                );
+            }
+            
+            // Sort items
+            switch(sortMethod) {
+                case 'date-asc':
+                    displayItems.sort((a, b) => new Date(a.dateAdded) - new Date(b.dateAdded));
+                    break;
+                case 'date-desc':
+                    displayItems.sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded));
+                    break;
+                case 'expiry-asc':
+                    displayItems.sort((a, b) => {
+                        if (!a.expiryDate) return 1;
+                        if (!b.expiryDate) return -1;
+                        return new Date(a.expiryDate) - new Date(b.expiryDate);
+                    });
+                    break;
+                case 'name-asc':
+                    displayItems.sort((a, b) => a.name.localeCompare(b.name));
+                    break;
+            }
+            
+            // Update FIFO status for all items
+            updateFifoStatuses(displayItems);
+            
+            // Populate table
+            displayItems.forEach(item => {
+                const row = document.createElement('tr');
+                
+                let statusIndicator;
+                switch(item.fifoStatus) {
+                    case 'violation':
+                        statusIndicator = '<span class="status-indicator status-violation"></span> Violation';
+                        row.classList.add('violation');
+                        break;
+                    case 'warning':
+                        statusIndicator = '<span class="status-indicator status-warning"></span> Warning';
+                        break;
+                    default:
+                        statusIndicator = '<span class="status-indicator status-good"></span> Compliant';
+                }
+                
+                row.innerHTML = `
+                    <td>${item.name}</td>
+                    <td>${item.batch || '-'}</td>
+                    <td>${item.quantity}</td>
+                    <td>${item.location}</td>
+                    <td>${new Date(item.dateAdded).toLocaleString()}</td>
+                    <td>${item.expiryDate ? new Date(item.expiryDate).toLocaleDateString() : 'N/A'}</td>
+                    <td>${statusIndicator}</td>
+                    <td>
+                        <button onclick="retrieveItem('${item.id}')" style="padding: 5px; font-size: 12px;">Retrieve</button>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+        
+        // Retrieve item directly from inventory list
+        function retrieveItem(itemId) {
+            const itemIndex = inventoryItems.findIndex(i => i.id === itemId);
+            
+            if (itemIndex === -1) {
+                alert("Item not found!");
+                return;
+            }
+            
+            const item = inventoryItems[itemIndex];
+            
+            // Check FIFO compliance
+            const fifoCheck = checkFifoCompliance(item);
+            
+            // Confirm retrieval
+            const confirmMessage = fifoCheck.compliant 
+                ? `Retrieve ${item.name} (${item.batch || 'No Batch'})? This follows FIFO principles.` 
+                : `WARNING: Retrieving ${item.name} (${item.batch || 'No Batch'}) may violate FIFO! Reason: ${fifoCheck.reason}\n\nProceed anyway?`;
+            
+            if (confirm(confirmMessage)) {
+                // Remove from inventory
+                inventoryItems.splice(itemIndex, 1);
+                saveInventory();
+                
+                // Log activity
+                logActivity('retrieve', item, fifoCheck.compliant ? 'Item retrieved (FIFO compliant)' : 'Item retrieved (FIFO violation)');
+                
+                // Update displays
+                updateInventoryDisplay();
+                updateDashboard();
+                
+                alert(`Item ${item.name} has been retrieved from inventory.`);
+            }
+        }
+        
+        // Update FIFO statuses for items
+        function updateFifoStatuses(items) {
+            // Group by product name
+            const itemsByName = {};
+            items.forEach(item => {
+                if (!itemsByName[item.name]) {
+                    itemsByName[item.name] = [];
+                }
+                itemsByName[item.name].push(item);
+            });
+            
+            // Check each group
+            Object.values(itemsByName).forEach(itemGroup => {
+                if (itemGroup.length <= 1) {
+                    itemGroup[0].fifoStatus = 'compliant';
+                    return;
+                }
+                
+                // Sort by date added
+                itemGroup.sort((a, b) => new Date(a.dateAdded) - new Date(b.dateAdded));
+                
+                // Check expiration dates first
+                const today = new Date();
+                itemGroup.forEach(item => {
+                    if (item.expiryDate) {
+                        const expiryDate = new Date(item.expiryDate);
+                        const daysUntilExpiry = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+                        
+                        if (daysUntilExpiry < 0) {
+                            item.fifoStatus = 'violation'; // Expired
+                        } else if (daysUntilExpiry < 7) {
+                            item.fifoStatus = 'warning'; // Expiring soon
+                        }
+                    }
+                });
+                
+                // Check if newer items are being accessed before older ones
+                for (let i = 1; i < itemGroup.length; i++) {
+                    const olderItem = itemGroup[i-1];
+                    const newerItem = itemGroup[i];
+                    
+                    // If an older item is compliant but newer ones are being used, mark as warning
+                    if (olderItem.fifoStatus === 'compliant') {
+                        olderItem.fifoStatus = 'warning';
+                    }
+                }
+            });
+        }
+        
+        // Check if retrieving an item complies with FIFO
+        function checkFifoCompliance(item) {
+            const sameItems = inventoryItems.filter(i => i.name === item.name);
+            
+            if (sameItems.length <= 1) {
+                return { compliant: true, reason: '' };
+            }
+            
+            // Find oldest item
+            const sortedItems = [...sameItems].sort((a, b) => new Date(a.dateAdded) - new Date(b.dateAdded));
+            const oldestItem = sortedItems[0];
+            
+            // Check expiry dates first
+            const itemsWithExpiry = sameItems.filter(i => i.expiryDate);
+            if (itemsWithExpiry.length > 0) {
+                const sortedByExpiry = [...itemsWithExpiry].sort((a, b) => 
+                    new Date(a.expiryDate) - new Date(b.expiryDate));
+                const soonestExpiry = sortedByExpiry[0];
+                
+                if (item.id !== soonestExpiry.id) {
+                    return { 
+                        compliant: false, 
+                        reason: `Item expiring on ${new Date(soonestExpiry.expiryDate).toLocaleDateString()} should be used first` 
+                    };
+                }
+            }
+            
+            // Then check by date added
+            if (item.id !== oldestItem.id) {
+                return { 
+                    compliant: false, 
+                    reason: `Older inventory from ${new Date(oldestItem.dateAdded).toLocaleDateString()} should be used first` 
+                };
+            }
+            
+            return { compliant: true, reason: '' };
+        }
+        
+        // Update dashboard stats
+        function updateDashboard() {
+            document.getElementById('total-items').textContent = inventoryItems.length;
+            
+            // Calculate FIFO compliance
+            let compliantItems = 0;
+            inventoryItems.forEach(item => {
+                if (checkFifoCompliance(item).compliant) {
+                    compliantItems++;
+                }
+            });
+            
+            const complianceRate = inventoryItems.length > 0 
+                ? Math.round((compliantItems / inventoryItems.length) * 100) 
+                : 100;
+            
+            document.getElementById('fifo-compliance').textContent = `${complianceRate}%`;
+            
+            // Check expiring items
+            const today = new Date();
+            let expiringItems = 0;
+            
+            inventoryItems.forEach(item => {
+                if (item.expiryDate) {
+                    const expiryDate = new Date(item.expiryDate);
+                    const daysUntilExpiry = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+                    
+                    if (daysUntilExpiry >= 0 && daysUntilExpiry <= 14) {
+                        expiringItems++;
+                    }
+                }
+            });
+            
+            document.getElementById('expiring-soon').textContent = expiringItems;
+        }
+        
+        // Update recent activity log
+        function updateRecentActivity() {
+            const tbody = document.getElementById('recent-activity-body');
+            tbody.innerHTML = '';
+            
+            // Show only the last 10 activities
+            const recentActivities = activityLog.slice(0, 10);
+            
+            recentActivities.forEach(activity => {
+                const row = document.createElement('tr');
+                
+                let statusClass = '';
+                let statusIndicator = '<span class="status-indicator status-good"></span>';
+                
+                if (activity.action === 'retrieve' && activity.details.includes('violation')) {
+                    statusClass = 'violation';
+                    statusIndicator = '<span class="status-indicator status-violation"></span>';
+                } else if (activity.details.includes('warning')) {
+                    statusIndicator = '<span class="status-indicator status-warning"></span>';
+                }
+                
+                row.className = statusClass;
+                row.innerHTML = `
+                    <td>${new Date(activity.timestamp).toLocaleString()}</td>
+                    <td>${capitalizeFirstLetter(activity.action)}</td>
+                    <td>${activity.item.name} ${activity.item.batch ?
